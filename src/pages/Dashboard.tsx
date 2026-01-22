@@ -1,31 +1,82 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { TopBar } from '@/components/TopBar';
 import { SummaryCard } from '@/components/SummaryCard';
 import { ProcessesTable } from '@/components/ProcessesTable';
 import { RemotePortsList } from '@/components/RemotePortsList';
 import { RecentChangesList } from '@/components/RecentChangesList';
-import { 
-  mockConnections, 
-  mockRecentChanges, 
-  getProcessStats, 
-  getRemotePortStats 
-} from '@/data/mockData';
+import { getConnections } from '@/api/tauri';
+import { Connection } from '@/types/netwatch';
 import { Network, Globe, Wifi, Radio } from 'lucide-react';
 
 export default function Dashboard() {
   const [, setSearchQuery] = useState('');
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const stats = useMemo(() => {
-    const activeConnections = mockConnections.length;
-    const uniqueRemoteIPs = new Set(mockConnections.map(c => c.remoteAddr)).size;
-    const establishedTCP = mockConnections.filter(c => c.protocol === 'TCP' && c.state === 'ESTABLISHED').length;
-    const listeningPorts = mockConnections.filter(c => c.state === 'LISTENING').length;
-    
-    return { activeConnections, uniqueRemoteIPs, establishedTCP, listeningPorts };
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const fetchedConnections = await getConnections();
+        setConnections(fetchedConnections);
+      } catch (error) {
+        console.error('Failed to fetch connections:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const processStats = useMemo(() => getProcessStats(mockConnections), []);
-  const portStats = useMemo(() => getRemotePortStats(mockConnections), []);
+  const stats = useMemo(() => {
+    const activeConnections = connections.length;
+    const uniqueRemoteIPs = new Set(connections.map(c => c.remoteAddr)).size;
+    const establishedTCP = connections.filter(c => c.protocol === 'TCP' && c.state === 'ESTABLISHED').length;
+    const listeningPorts = connections.filter(c => c.state === 'LISTENING').length;
+    
+    return { activeConnections, uniqueRemoteIPs, establishedTCP, listeningPorts };
+  }, [connections]);
+
+  const processStats = useMemo(() => {
+    const processMap = new Map<number, { name: string; count: number; maxRisk: 'low' | 'medium' | 'high' }>();
+    
+    connections.forEach(conn => {
+      const existing = processMap.get(conn.pid);
+      if (existing) {
+        existing.count++;
+        if (conn.risk === 'high' || (conn.risk === 'medium' && existing.maxRisk === 'low')) {
+          existing.maxRisk = conn.risk;
+        }
+      } else {
+        processMap.set(conn.pid, { name: conn.processName, count: 1, maxRisk: conn.risk });
+      }
+    });
+    
+    return Array.from(processMap.entries())
+      .map(([pid, data]) => ({ pid, ...data }))
+      .sort((a, b) => b.count - a.count);
+  }, [connections]);
+
+  const portStats = useMemo(() => {
+    const portMap = new Map<number, { protocol: string; count: number; maxRisk: 'low' | 'medium' | 'high' }>();
+    
+    connections.forEach(conn => {
+      if (conn.remotePort === 0) return;
+      const existing = portMap.get(conn.remotePort);
+      if (existing) {
+        existing.count++;
+        if (conn.risk === 'high' || (conn.risk === 'medium' && existing.maxRisk === 'low')) {
+          existing.maxRisk = conn.risk;
+        }
+      } else {
+        portMap.set(conn.remotePort, { protocol: conn.protocol, count: 1, maxRisk: conn.risk });
+      }
+    });
+    
+    return Array.from(portMap.entries())
+      .map(([port, data]) => ({ port, ...data }))
+      .sort((a, b) => b.count - a.count);
+  }, [connections]);
 
   return (
     <>
@@ -75,7 +126,7 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Changes */}
-        <RecentChangesList changes={mockRecentChanges} />
+        <RecentChangesList changes={[]} />
       </main>
     </>
   );

@@ -1,7 +1,15 @@
 import { formatDistanceToNow } from 'date-fns';
-import { RecentChange } from '@/data/mockData';
+import { Connection } from '@/types/netwatch';
 import { Plus, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface RecentChange {
+  id: string;
+  type: 'new' | 'closed' | 'changed';
+  message: string;
+  timestamp: number; // Unix timestamp in milliseconds
+  processName: string;
+}
 
 interface RecentChangesListProps {
   changes: RecentChange[];

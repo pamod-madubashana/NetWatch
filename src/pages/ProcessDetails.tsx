@@ -1,25 +1,39 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { TopBar } from '@/components/TopBar';
 import { SummaryCard } from '@/components/SummaryCard';
 import { RiskBadge } from '@/components/RiskBadge';
 import { ConnectionsTable } from '@/components/ConnectionsTable';
-import { mockConnections } from '@/data/mockData';
+import { getConnections } from '@/api/tauri';
+import { Connection } from '@/types/netwatch';
 import { ArrowLeft, Copy, Download, Network, Globe, AlertTriangle } from 'lucide-react';
 
 export default function ProcessDetails() {
   const { pid } = useParams<{ pid: string }>();
   const navigate = useNavigate();
   const pidNumber = parseInt(pid || '0', 10);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const fetchedConnections = await getConnections();
+        setConnections(fetchedConnections);
+      } catch (error) {
+        console.error('Failed to fetch connections:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const processConnections = useMemo(() => {
-    return mockConnections
-      .filter(conn => conn.pid === pidNumber)
-      .map(conn => ({
-        ...conn,
-        capturedAt: conn.capturedAt.getTime(),
-      }));
-  }, [pidNumber]);
+    return connections
+      .filter(conn => conn.pid === pidNumber);
+  }, [connections, pidNumber]);
 
   const processName = processConnections[0]?.processName || 'Unknown Process';
 
@@ -28,7 +42,7 @@ export default function ProcessDetails() {
     const uniqueRemoteIPs = new Set(processConnections.map(c => c.remoteAddr)).size;
     
     let highestRisk: 'low' | 'medium' | 'high' = 'low';
-    processConnections.forEach(conn => {
+    processConnections.forEach((conn: Connection) => {
       if (conn.risk === 'high') highestRisk = 'high';
       else if (conn.risk === 'medium' && highestRisk !== 'high') highestRisk = 'medium';
     });
@@ -38,7 +52,7 @@ export default function ProcessDetails() {
 
   const remoteIPBreakdown = useMemo(() => {
     const ipMap = new Map<string, number>();
-    processConnections.forEach(conn => {
+    processConnections.forEach((conn: Connection) => {
       const count = ipMap.get(conn.remoteAddr) || 0;
       ipMap.set(conn.remoteAddr, count + 1);
     });
@@ -49,11 +63,31 @@ export default function ProcessDetails() {
 
   const allRiskReasons = useMemo(() => {
     const reasons = new Set<string>();
-    processConnections.forEach(conn => {
-      conn.riskReasons.forEach(r => reasons.add(r));
+    processConnections.forEach((conn: Connection) => {
+      conn.riskReasons.forEach((r: string) => reasons.add(r));
     });
     return Array.from(reasons);
   }, [processConnections]);
+
+  if (loading) {
+    return (
+      <>
+        <TopBar title="Process Details" />
+        <main className="flex-1 overflow-auto p-6 min-h-0">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   if (processConnections.length === 0) {
     return (
