@@ -13,7 +13,12 @@ export default function ProcessDetails() {
   const pidNumber = parseInt(pid || '0', 10);
 
   const processConnections = useMemo(() => {
-    return mockConnections.filter(conn => conn.pid === pidNumber);
+    return mockConnections
+      .filter(conn => conn.pid === pidNumber)
+      .map(conn => ({
+        ...conn,
+        capturedAt: conn.capturedAt.getTime(),
+      }));
   }, [pidNumber]);
 
   const processName = processConnections[0]?.processName || 'Unknown Process';

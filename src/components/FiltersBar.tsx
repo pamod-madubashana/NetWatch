@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Search, Filter, Download, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Download, ChevronDown } from 'lucide-react';
 import { Connection } from '@/types/netwatch';
 
 interface FiltersBarProps {

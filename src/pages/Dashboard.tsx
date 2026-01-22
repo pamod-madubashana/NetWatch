@@ -13,7 +13,7 @@ import {
 import { Network, Globe, Wifi, Radio } from 'lucide-react';
 
 export default function Dashboard() {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [, setSearchQuery] = useState('');
 
   const stats = useMemo(() => {
     const activeConnections = mockConnections.length;
