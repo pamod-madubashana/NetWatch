@@ -35,15 +35,7 @@ impl RiskLevel {
     }
 }
 
-impl From<super::RiskLevel> for RiskLevel {
-    fn from(risk: super::RiskLevel) -> Self {
-        match risk {
-            super::RiskLevel::Low => RiskLevel::Low,
-            super::RiskLevel::Medium => RiskLevel::Medium,
-            super::RiskLevel::High => RiskLevel::High,
-        }
-    }
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessInfo {
