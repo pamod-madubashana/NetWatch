@@ -1,5 +1,4 @@
 import { formatDistanceToNow } from 'date-fns';
-import { Connection } from '@/types/netwatch';
 import { Plus, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

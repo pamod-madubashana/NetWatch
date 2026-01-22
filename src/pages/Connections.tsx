@@ -9,7 +9,7 @@ import { getConnections, exportConnections } from '@/api/tauri';
 import { Connection } from '@/types/netwatch';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { RotateCcw, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 

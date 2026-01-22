@@ -99,6 +99,12 @@ export default function Dashboard() {
         onRefresh={fetchConnections}
       />
       
+      {loading && (
+        <div className="flex justify-center items-center h-16 bg-card border-b border-border">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+        </div>
+      )}
+      
       <main className="flex-1 overflow-auto p-6 min-h-0">
         {/* Summary Cards */}
         <div className="grid grid-cols-4 gap-4 mb-6">
