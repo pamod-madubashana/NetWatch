@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Search, Filter, Download, ChevronDown } from 'lucide-react';
-import { Connection } from '@/data/mockData';
+import { Connection } from '@/types/netwatch';
 
 interface FiltersBarProps {
   onFiltersChange: (filters: FilterState) => void;
@@ -107,10 +107,14 @@ export function FiltersBar({ onFiltersChange, totalCount, filteredCount }: Filte
         </label>
 
         {/* Export */}
-        <button className="h-9 px-4 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
-          <Download className="w-4 h-4" />
-          Export
-        </button>
+        <div className="relative">
+          <button className="h-9 px-4 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+            <Download className="w-4 h-4" />
+            Export
+            <ChevronDown className="w-4 h-4 ml-1" />
+          </button>
+          {/* Export dropdown would go here - implemented in Connections page */}
+        </div>
       </div>
 
       {/* Count */}

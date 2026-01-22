@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Connection } from '@/data/mockData';
+import { Connection } from '@/types/netwatch';
 import { RiskBadge } from './RiskBadge';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -64,7 +64,7 @@ export function ConnectionsTable({ connections }: ConnectionsTableProps) {
               </td>
               <td className="px-4 py-3">
                 <span className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(conn.capturedAt, { addSuffix: true })}
+                  {formatDistanceToNow(new Date(conn.capturedAt), { addSuffix: true })}
                 </span>
               </td>
             </tr>

@@ -7,12 +7,8 @@ mod commands;
 
 use models::*;
 use services::ConnectionCollector;
-
-#[tauri::command]
-async fn get_connections() -> Result<Vec<Connection>, String> {
-    let collector = ConnectionCollector::new();
-    collector.get_connections()
-}
+use commands::connections::get_connections;
+use commands::export::export_connections;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -23,7 +19,7 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, get_connections])
+        .invoke_handler(tauri::generate_handler![greet, get_connections, export_connections])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

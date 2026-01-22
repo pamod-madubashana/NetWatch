@@ -1,4 +1,4 @@
-export interface Connection {
+export interface MockConnection {
   id: string;
   processName: string;
   pid: number;
@@ -21,7 +21,7 @@ export interface RecentChange {
   processName: string;
 }
 
-export const mockConnections: Connection[] = [
+export const mockConnections: MockConnection[] = [
   {
     id: '1',
     processName: 'chrome.exe',
@@ -279,7 +279,7 @@ export const mockRecentChanges: RecentChange[] = [
   },
 ];
 
-export const getProcessStats = (connections: Connection[]) => {
+export const getProcessStats = (connections: MockConnection[]) => {
   const processMap = new Map<number, { name: string; count: number; maxRisk: 'low' | 'medium' | 'high' }>();
   
   connections.forEach(conn => {
@@ -299,7 +299,7 @@ export const getProcessStats = (connections: Connection[]) => {
     .sort((a, b) => b.count - a.count);
 };
 
-export const getRemotePortStats = (connections: Connection[]) => {
+export const getRemotePortStats = (connections: MockConnection[]) => {
   const portMap = new Map<number, { protocol: string; count: number; maxRisk: 'low' | 'medium' | 'high' }>();
   
   connections.forEach(conn => {

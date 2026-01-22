@@ -1,11 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TopBar } from '@/components/TopBar';
 import { FiltersBar, FilterState, applyFilters } from '@/components/FiltersBar';
 import { ConnectionsTable } from '@/components/ConnectionsTable';
 import { Pagination } from '@/components/Pagination';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { mockConnections } from '@/data/mockData';
+import { getConnections, exportConnections } from '@/api/tauri';
+import { Connection } from '@/types/netwatch';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { RotateCcw, Download } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -20,10 +25,84 @@ export default function Connections() {
     risk: 'all',
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [showError] = useState(false);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  const { toast } = useToast();
+
+  const fetchConnections = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const fetchedConnections = await getConnections();
+      setConnections(fetchedConnections);
+    } catch (err) {
+      console.error('Failed to fetch connections:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch connections');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExport = async (format: 'json' | 'csv') => {
+    try {
+      if (connections.length === 0) {
+        toast({
+          title: 'Nothing to export',
+          description: 'No connections available to export.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      const filePath = await exportConnections(format, connections);
+      toast({
+        title: 'Export successful',
+        description: `File saved to: ${filePath}`,
+      });
+    } catch (err) {
+      console.error('Export failed:', err);
+      toast({
+        title: 'Export failed',
+        description: err instanceof Error ? err.message : 'An error occurred during export',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  useEffect(() => {
+    fetchConnections();
+    
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (autoRefresh) {
+      const interval = setInterval(fetchConnections, 5000); // Refresh every 5 seconds
+      setRefreshInterval(interval);
+    } else {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        setRefreshInterval(null);
+      }
+    }
+    
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  }, [autoRefresh]);
 
   const filteredConnections = useMemo(() => {
-    let result = applyFilters(mockConnections, filters);
+    let result = applyFilters(connections, filters);
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -34,7 +113,7 @@ export default function Connections() {
     }
     
     return result;
-  }, [filters, searchQuery]);
+  }, [connections, filters, searchQuery]);
 
   const paginatedConnections = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -55,21 +134,60 @@ export default function Connections() {
         searchPlaceholder="Quick search..."
         onSearch={setSearchQuery}
       />
+              
+      <div className="flex gap-2 mb-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={fetchConnections}
+          disabled={loading}
+        >
+          <RotateCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+                
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAutoRefresh(!autoRefresh)}
+          className={autoRefresh ? 'bg-accent' : ''}
+        >
+          Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
+        </Button>
+                
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleExport('json')}>
+              Export as JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport('csv')}>
+              Export as CSV
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       
       <main className="flex-1 overflow-auto p-6 min-h-0">
-        {showError && (
-          <div className="mb-4">
-            <ErrorBanner message="Failed to fetch latest connections. Showing cached data." />
-          </div>
-        )}
 
         <FiltersBar
           onFiltersChange={handleFiltersChange}
-          totalCount={mockConnections.length}
+          totalCount={connections.length}
           filteredCount={filteredConnections.length}
         />
 
-        {filteredConnections.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        ) : error ? (
+          <ErrorBanner message={`Failed to load connections: ${error}`} />
+        ) : filteredConnections.length === 0 ? (
           <EmptyState 
             title="No connections found"
             description="Try adjusting your filters or search terms to find what you're looking for."
