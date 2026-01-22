@@ -136,20 +136,55 @@ impl WindowsConnectionCollector {
     }
 
     fn get_tcp_connections(&self) -> Result<Vec<PowerShellTcpConnection>, String> {
+        // Try primary method first
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
                 "Get-NetTCPConnection | Select-Object OwningProcess, LocalAddress, LocalPort, RemoteAddress, RemotePort, State | ConvertTo-Json"
             ])
-            .output()
-            .map_err(|e| format!("Failed to execute PowerShell command: {}", e))?;
-
-        if !output.status.success() {
-            return Err(format!(
-                "PowerShell command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
+            .output();
+        
+        let output = match output {
+            Ok(out) => {
+                if out.status.success() {
+                    out
+                } else {
+                    // If primary command fails, try an alternative approach
+                    let alt_output = Command::new("cmd")
+                        .args(["/C", "netstat -ano -p TCP"])
+                        .output();
+                    
+                    match alt_output {
+                        Ok(alt_out) if alt_out.status.success() => {
+                            return self.parse_netstat_output(String::from_utf8(alt_out.stdout)
+                                .map_err(|e| format!("Failed to parse netstat output: {}", e))?);
+                        },
+                        _ => {
+                            return Err(format!(
+                                "PowerShell command failed and fallback also failed: {}",
+                                String::from_utf8_lossy(&out.stderr)
+                            ));
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                // If PowerShell fails entirely, try netstat as fallback
+                let alt_output = Command::new("cmd")
+                    .args(["/C", "netstat -ano -p TCP"])
+                    .output();
+                
+                match alt_output {
+                    Ok(alt_out) if alt_out.status.success() => {
+                        return self.parse_netstat_output(String::from_utf8(alt_out.stdout)
+                            .map_err(|e| format!("Failed to parse netstat output: {}", e))?);
+                    },
+                    _ => {
+                        return Err(format!("Failed to execute PowerShell and fallback command: {}", e));
+                    }
+                }
+            }
+        };
 
         let stdout = String::from_utf8(output.stdout)
             .map_err(|e| format!("Failed to parse PowerShell output: {}", e))?;
@@ -169,21 +204,104 @@ impl WindowsConnectionCollector {
         }
     }
 
+    fn parse_netstat_output(&self, output: String) -> Result<Vec<PowerShellTcpConnection>, String> {
+        let mut connections = Vec::new();
+        
+        for line in output.lines() {
+            let line = line.trim();
+            if line.starts_with("Proto") || line.is_empty() {
+                continue; // Skip header and empty lines
+            }
+            
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 4 {
+                // Parse: Proto Local Address Foreign Address State PID
+                if parts[0].to_uppercase() != "TCP" {
+                    continue; // Only interested in TCP
+                }
+                
+                // Parse local address:port
+                let local_parts: Vec<&str> = parts[1].rsplitn(2, ':').collect();
+                if local_parts.len() < 2 { continue; }
+                let local_port: u16 = local_parts[0].parse().unwrap_or(0);
+                let local_address = local_parts[1].trim();
+                
+                // Parse remote address:port
+                let remote_parts: Vec<&str> = parts[2].rsplitn(2, ':').collect();
+                if remote_parts.len() < 2 { continue; }
+                let remote_port: u16 = remote_parts[0].parse().unwrap_or(0);
+                let remote_address = remote_parts[1].trim();
+                
+                // State and PID
+                let state = if parts.len() >= 5 { parts[3].to_string() } else { "UNKNOWN".to_string() };
+                let pid: u32 = if parts.len() >= 5 { 
+                    parts.last().unwrap_or(&"0").parse().unwrap_or(0) 
+                } else { 0 };
+                
+                connections.push(PowerShellTcpConnection {
+                    owning_process: Some(pid),
+                    local_address: local_address.to_string(),
+                    local_port,
+                    remote_address: remote_address.to_string(),
+                    remote_port,
+                    state,
+                });
+            }
+        }
+        
+        Ok(connections)
+    }
+
     fn get_udp_endpoints(&self) -> Result<Vec<PowerShellUdpEndpoint>, String> {
+        // Try primary method first
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
                 "Get-NetUDPEndpoint | Select-Object OwningProcess, LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json"
             ])
-            .output()
-            .map_err(|e| format!("Failed to execute PowerShell UDP command: {}", e))?;
-
-        if !output.status.success() {
-            return Err(format!(
-                "PowerShell UDP command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
+            .output();
+        
+        let output = match output {
+            Ok(out) => {
+                if out.status.success() {
+                    out
+                } else {
+                    // If primary command fails, try an alternative approach
+                    let alt_output = Command::new("cmd")
+                        .args(["/C", "netstat -ano -p UDP"])
+                        .output();
+                    
+                    match alt_output {
+                        Ok(alt_out) if alt_out.status.success() => {
+                            return self.parse_udp_netstat_output(String::from_utf8(alt_out.stdout)
+                                .map_err(|e| format!("Failed to parse UDP netstat output: {}", e))?);
+                        },
+                        _ => {
+                            return Err(format!(
+                                "PowerShell UDP command failed and fallback also failed: {}",
+                                String::from_utf8_lossy(&out.stderr)
+                            ));
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                // If PowerShell fails entirely, try netstat as fallback
+                let alt_output = Command::new("cmd")
+                    .args(["/C", "netstat -ano -p UDP"])
+                    .output();
+                
+                match alt_output {
+                    Ok(alt_out) if alt_out.status.success() => {
+                        return self.parse_udp_netstat_output(String::from_utf8(alt_out.stdout)
+                            .map_err(|e| format!("Failed to parse UDP netstat output: {}", e))?);
+                    },
+                    _ => {
+                        return Err(format!("Failed to execute PowerShell and fallback UDP command: {}", e));
+                    }
+                }
+            }
+        };
 
         let stdout = String::from_utf8(output.stdout)
             .map_err(|e| format!("Failed to parse PowerShell UDP output: {}", e))?;
@@ -203,21 +321,105 @@ impl WindowsConnectionCollector {
         }
     }
 
+    fn parse_udp_netstat_output(&self, output: String) -> Result<Vec<PowerShellUdpEndpoint>, String> {
+        let mut endpoints = Vec::new();
+        
+        for line in output.lines() {
+            let line = line.trim();
+            if line.starts_with("Proto") || line.is_empty() {
+                continue; // Skip header and empty lines
+            }
+            
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 4 {
+                // Parse: Proto Local Address Foreign Address PID
+                if parts[0].to_uppercase() != "UDP" {
+                    continue; // Only interested in UDP
+                }
+                
+                // Parse local address:port
+                let local_parts: Vec<&str> = parts[1].rsplitn(2, ':').collect();
+                if local_parts.len() < 2 { continue; }
+                let local_port: u16 = local_parts[0].parse().unwrap_or(0);
+                let local_address = local_parts[1].trim();
+                
+                // For UDP, the remote address may be "*" (any address)
+                let remote_parts: Vec<&str> = parts[2].rsplitn(2, ':').collect();
+                let remote_port: u16 = if remote_parts.len() >= 2 { 
+                    remote_parts[0].parse().unwrap_or(0) 
+                } else { 0 };
+                let remote_address = if remote_parts.len() >= 2 { 
+                    remote_parts[1].trim() 
+                } else { "*" };
+                
+                // PID is the last column
+                let pid: u32 = if parts.len() >= 5 { 
+                    parts.last().unwrap_or(&"0").parse().unwrap_or(0) 
+                } else { 0 };
+                
+                endpoints.push(PowerShellUdpEndpoint {
+                    owning_process: Some(pid),
+                    local_address: local_address.to_string(),
+                    local_port,
+                    remote_address: remote_address.to_string(),
+                    remote_port,
+                });
+            }
+        }
+        
+        Ok(endpoints)
+    }
+
     fn get_process_map(&self) -> Result<HashMap<u32, String>, String> {
+        // Try primary method first
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
                 "Get-Process | Select-Object Id, ProcessName | ConvertTo-Json"
             ])
-            .output()
-            .map_err(|e| format!("Failed to execute PowerShell process command: {}", e))?;
-
-        if !output.status.success() {
-            return Err(format!(
-                "PowerShell process command failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
+            .output();
+        
+        let output = match output {
+            Ok(out) => {
+                if out.status.success() {
+                    out
+                } else {
+                    // If primary command fails, try an alternative approach
+                    let alt_output = Command::new("cmd")
+                        .args(["/C", "tasklist /FO CSV"])
+                        .output();
+                    
+                    match alt_output {
+                        Ok(alt_out) if alt_out.status.success() => {
+                            return self.parse_tasklist_output(String::from_utf8(alt_out.stdout)
+                                .map_err(|e| format!("Failed to parse tasklist output: {}", e))?);
+                        },
+                        _ => {
+                            return Err(format!(
+                                "PowerShell process command failed and fallback also failed: {}",
+                                String::from_utf8_lossy(&out.stderr)
+                            ));
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                // If PowerShell fails entirely, try tasklist as fallback
+                let alt_output = Command::new("cmd")
+                    .args(["/C", "tasklist /FO CSV"])
+                    .output();
+                
+                match alt_output {
+                    Ok(alt_out) if alt_out.status.success() => {
+                        return self.parse_tasklist_output(String::from_utf8(alt_out.stdout)
+                            .map_err(|e| format!("Failed to parse tasklist output: {}", e))?);
+                    },
+                    _ => {
+                        return Err(format!("Failed to execute PowerShell and fallback process command: {}", e));
+                    }
+                }
+            }
+        };
 
         let stdout = String::from_utf8(output.stdout)
             .map_err(|e| format!("Failed to parse PowerShell process output: {}", e))?;
@@ -240,6 +442,30 @@ impl WindowsConnectionCollector {
             process_map.insert(proc.id, proc.name);
         }
 
+        Ok(process_map)
+    }
+
+    fn parse_tasklist_output(&self, output: String) -> Result<HashMap<u32, String>, String> {
+        let mut process_map = HashMap::new();
+        
+        for (i, line) in output.lines().enumerate() {
+            if i == 0 { continue; } // Skip header row
+            
+            let line = line.trim();
+            if line.is_empty() { continue; }
+            
+            // Tasklist CSV format: "Image Name","PID","Session Name","Session#","Mem Usage"
+            let parts: Vec<&str> = line.split(",").map(|s| s.trim_matches('"')).collect();
+            if parts.len() >= 2 {
+                if let Ok(pid) = parts[1].parse::<u32>() {
+                    let process_name = parts[0].to_string();
+                    // Remove .exe extension if present
+                    let clean_name = process_name.trim_end_matches(".exe").to_string();
+                    process_map.insert(pid, clean_name);
+                }
+            }
+        }
+        
         Ok(process_map)
     }
 
