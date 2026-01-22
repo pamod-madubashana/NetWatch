@@ -1,0 +1,261 @@
+use crate::models::{Connection, NetworkEndpoint, ProcessInfo, RiskLevel, calculate_risk};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::process::Command;
+use uuid::Uuid;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct PowerShellTcpConnection {
+    #[serde(rename = "OwningProcess")]
+    owning_process: Option<u32>,
+    #[serde(rename = "LocalAddress")]
+    local_address: String,
+    #[serde(rename = "LocalPort")]
+    local_port: u16,
+    #[serde(rename = "RemoteAddress")]
+    remote_address: String,
+    #[serde(rename = "RemotePort")]
+    remote_port: u16,
+    #[serde(rename = "State")]
+    state: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct PowerShellUdpEndpoint {
+    #[serde(rename = "OwningProcess")]
+    owning_process: Option<u32>,
+    #[serde(rename = "LocalAddress")]
+    local_address: String,
+    #[serde(rename = "LocalPort")]
+    local_port: u16,
+    #[serde(rename = "RemoteAddress")]
+    remote_address: String,
+    #[serde(rename = "RemotePort")]
+    remote_port: u16,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct PowerShellProcess {
+    #[serde(rename = "Id")]
+    id: u32,
+    #[serde(rename = "ProcessName")]
+    name: String,
+}
+
+pub struct WindowsConnectionCollector;
+
+impl WindowsConnectionCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn get_connections(&self) -> Result<Vec<Connection>, String> {
+        let tcp_connections = self.get_tcp_connections()?;
+        let udp_endpoints = self.get_udp_endpoints()?;
+        let process_map = self.get_process_map()?;
+
+        let mut connections = Vec::new();
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| format!("Time error: {}", e))?
+            .as_millis() as u64;
+
+        // Process TCP connections
+        for tcp_conn in tcp_connections {
+            let endpoint = NetworkEndpoint {
+                protocol: "TCP".to_string(),
+                local_address: tcp_conn.local_address.clone(),
+                local_port: tcp_conn.local_port,
+                remote_address: tcp_conn.remote_address.clone(),
+                remote_port: tcp_conn.remote_port,
+                state: self.map_tcp_state(&tcp_conn.state),
+                owning_process_id: tcp_conn.owning_process,
+            };
+
+            let (risk, risk_reasons) = calculate_risk(&endpoint);
+            
+            let process_name = if let Some(pid) = tcp_conn.owning_process {
+                process_map.get(&pid).cloned().unwrap_or_else(|| "unknown".to_string())
+            } else {
+                "system".to_string()
+            };
+
+            connections.push(Connection {
+                id: Uuid::new_v4().to_string(),
+                process_name,
+                pid: tcp_conn.owning_process.unwrap_or(0),
+                protocol: "TCP".to_string(),
+                local_addr: tcp_conn.local_address,
+                local_port: tcp_conn.local_port,
+                remote_addr: tcp_conn.remote_address,
+                remote_port: tcp_conn.remote_port,
+                state: self.map_tcp_state(&tcp_conn.state),
+                risk,
+                risk_reasons,
+                captured_at: timestamp,
+            });
+        }
+
+        // Process UDP endpoints
+        for udp_endpoint in udp_endpoints {
+            let endpoint = NetworkEndpoint {
+                protocol: "UDP".to_string(),
+                local_address: udp_endpoint.local_address.clone(),
+                local_port: udp_endpoint.local_port,
+                remote_address: udp_endpoint.remote_address.clone(),
+                remote_port: udp_endpoint.remote_port,
+                state: "Established".to_string(), // UDP is connectionless, but we'll mark active ones
+                owning_process_id: udp_endpoint.owning_process,
+            };
+
+            let (risk, risk_reasons) = calculate_risk(&endpoint);
+            
+            let process_name = if let Some(pid) = udp_endpoint.owning_process {
+                process_map.get(&pid).cloned().unwrap_or_else(|| "unknown".to_string())
+            } else {
+                "system".to_string()
+            };
+
+            connections.push(Connection {
+                id: Uuid::new_v4().to_string(),
+                process_name,
+                pid: udp_endpoint.owning_process.unwrap_or(0),
+                protocol: "UDP".to_string(),
+                local_addr: udp_endpoint.local_address,
+                local_port: udp_endpoint.local_port,
+                remote_addr: udp_endpoint.remote_address,
+                remote_port: udp_endpoint.remote_port,
+                state: "Active".to_string(),
+                risk,
+                risk_reasons,
+                captured_at: timestamp,
+            });
+        }
+
+        Ok(connections)
+    }
+
+    fn get_tcp_connections(&self) -> Result<Vec<PowerShellTcpConnection>, String> {
+        let output = Command::new("powershell.exe")
+            .args([
+                "-Command",
+                "Get-NetTCPConnection | Select-Object OwningProcess, LocalAddress, LocalPort, RemoteAddress, RemotePort, State | ConvertTo-Json"
+            ])
+            .output()
+            .map_err(|e| format!("Failed to execute PowerShell command: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "PowerShell command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        let stdout = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Failed to parse PowerShell output: {}", e))?;
+
+        // Handle both single object and array cases
+        let connections: Result<Vec<PowerShellTcpConnection>, _> = serde_json::from_str(&stdout);
+        
+        match connections {
+            Ok(conns) => Ok(conns),
+            Err(_) => {
+                // Try parsing as single object
+                match serde_json::from_str::<PowerShellTcpConnection>(&stdout) {
+                    Ok(single_conn) => Ok(vec![single_conn]),
+                    Err(e) => Err(format!("Failed to parse TCP connections JSON: {}", e)),
+                }
+            }
+        }
+    }
+
+    fn get_udp_endpoints(&self) -> Result<Vec<PowerShellUdpEndpoint>, String> {
+        let output = Command::new("powershell.exe")
+            .args([
+                "-Command",
+                "Get-NetUDPEndpoint | Select-Object OwningProcess, LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json"
+            ])
+            .output()
+            .map_err(|e| format!("Failed to execute PowerShell UDP command: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "PowerShell UDP command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        let stdout = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Failed to parse PowerShell UDP output: {}", e))?;
+
+        // Handle both single object and array cases
+        let endpoints: Result<Vec<PowerShellUdpEndpoint>, _> = serde_json::from_str(&stdout);
+        
+        match endpoints {
+            Ok(endpoints) => Ok(endpoints),
+            Err(_) => {
+                // Try parsing as single object
+                match serde_json::from_str::<PowerShellUdpEndpoint>(&stdout) {
+                    Ok(single_endpoint) => Ok(vec![single_endpoint]),
+                    Err(e) => Err(format!("Failed to parse UDP endpoints JSON: {}", e)),
+                }
+            }
+        }
+    }
+
+    fn get_process_map(&self) -> Result<HashMap<u32, String>, String> {
+        let output = Command::new("powershell.exe")
+            .args([
+                "-Command",
+                "Get-Process | Select-Object Id, ProcessName | ConvertTo-Json"
+            ])
+            .output()
+            .map_err(|e| format!("Failed to execute PowerShell process command: {}", e))?;
+
+        if !output.status.success() {
+            return Err(format!(
+                "PowerShell process command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        let stdout = String::from_utf8(output.stdout)
+            .map_err(|e| format!("Failed to parse PowerShell process output: {}", e))?;
+
+        let processes: Result<Vec<PowerShellProcess>, _> = serde_json::from_str(&stdout);
+        
+        let process_list = match processes {
+            Ok(procs) => procs,
+            Err(_) => {
+                // Try parsing as single object
+                match serde_json::from_str::<PowerShellProcess>(&stdout) {
+                    Ok(single_proc) => vec![single_proc],
+                    Err(e) => return Err(format!("Failed to parse processes JSON: {}", e)),
+                }
+            }
+        };
+
+        let mut process_map = HashMap::new();
+        for proc in process_list {
+            process_map.insert(proc.id, proc.name);
+        }
+
+        Ok(process_map)
+    }
+
+    fn map_tcp_state(&self, state: &str) -> String {
+        match state.to_lowercase().as_str() {
+            "established" => "ESTABLISHED".to_string(),
+            "listen" => "LISTENING".to_string(),
+            "time_wait" => "TIME_WAIT".to_string(),
+            "close_wait" => "CLOSE_WAIT".to_string(),
+            "syn_sent" => "SYN_SENT".to_string(),
+            "syn_received" => "SYN_RECEIVED".to_string(),
+            "fin_wait1" => "FIN_WAIT1".to_string(),
+            "fin_wait2" => "FIN_WAIT2".to_string(),
+            "closing" => "CLOSING".to_string(),
+            "last_ack" => "LAST_ACK".to_string(),
+            _ => state.to_uppercase(),
+        }
+    }
+}
