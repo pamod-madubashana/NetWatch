@@ -1,4 +1,4 @@
-use crate::models::{Connection, NetworkEndpoint, ProcessInfo, RiskLevel, calculate_risk};
+use crate::models::{Connection, NetworkEndpoint, calculate_risk};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
@@ -90,7 +90,7 @@ impl WindowsConnectionCollector {
                 remote_addr: tcp_conn.remote_address,
                 remote_port: tcp_conn.remote_port,
                 state: self.map_tcp_state(&tcp_conn.state),
-                risk,
+                risk: risk.into(),
                 risk_reasons,
                 captured_at: timestamp,
             });
@@ -126,7 +126,7 @@ impl WindowsConnectionCollector {
                 remote_addr: udp_endpoint.remote_address,
                 remote_port: udp_endpoint.remote_port,
                 state: "Active".to_string(),
-                risk,
+                risk: risk.into(),
                 risk_reasons,
                 captured_at: timestamp,
             });

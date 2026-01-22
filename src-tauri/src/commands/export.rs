@@ -3,7 +3,7 @@ use serde_json;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use tauri::api::path;
+use tauri::Manager;
 
 #[derive(serde::Serialize)]
 struct ExportFormat {
@@ -14,10 +14,13 @@ struct ExportFormat {
 #[tauri::command]
 pub async fn export_connections(
     format: String, 
-    connections: Vec<Connection>
+    connections: Vec<Connection>,
+    app_handle: tauri::AppHandle,
 ) -> Result<String, String> {
-    let app_data_dir = path::app_data_dir(&tauri::Config::default())
-        .unwrap_or_else(|| PathBuf::from("./"));
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .unwrap_or_else(|_| PathBuf::from("./"));
     
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

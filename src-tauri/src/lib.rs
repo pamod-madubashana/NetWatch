@@ -1,12 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-use tauri::Manager;
 
 mod models;
 mod services;
 mod commands;
 
-use models::*;
-use services::ConnectionCollector;
 use commands::connections::get_connections;
 use commands::export::export_connections;
 

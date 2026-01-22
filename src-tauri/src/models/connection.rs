@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +31,16 @@ impl RiskLevel {
             RiskLevel::Low => "low",
             RiskLevel::Medium => "medium",
             RiskLevel::High => "high",
+        }
+    }
+}
+
+impl From<super::RiskLevel> for RiskLevel {
+    fn from(risk: super::RiskLevel) -> Self {
+        match risk {
+            super::RiskLevel::Low => RiskLevel::Low,
+            super::RiskLevel::Medium => RiskLevel::Medium,
+            super::RiskLevel::High => RiskLevel::High,
         }
     }
 }
