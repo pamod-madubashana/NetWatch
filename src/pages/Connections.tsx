@@ -7,7 +7,6 @@ import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { getConnections } from '@/api/tauri';
 import { Connection } from '@/types/netwatch';
-import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 
 const ITEMS_PER_PAGE = 10;
