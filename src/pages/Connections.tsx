@@ -28,7 +28,7 @@ export default function Connections() {
   const [error, setError] = useState<string | null>(null);
 
   
-  const { toast } = useToast();
+
 
   const fetchConnections = async () => {
     try {
