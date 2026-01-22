@@ -1,100 +1,129 @@
-# NetWatch
+# NetWatch 🌐
 
-A portfolio-quality network monitoring application built with Tauri, Rust, and React. This desktop application provides real-time visibility into active network connections on your local machine.
+<p align="center">
+  <img src="src-tauri/icons/icon.png" alt="NetWatch Logo" width="128" height="128">
+</p>
 
-## Features
+<p align="center">
+  <strong>A portfolio-quality network monitoring application built with Tauri, Rust, and React</strong>
+</p>
 
-- Real-time monitoring of TCP/UDP connections
-- Process identification for each connection
-- Risk assessment for connections (low/medium/high)
-- Filtering and search capabilities
-- Export to JSON/CSV formats
-- Auto-refresh and manual refresh options
+<p align="center">
+  Real-time visibility into active network connections on your local machine with advanced risk assessment and intuitive UI.
+</p>
 
-## Privacy Notice
+---
 
-This application monitors only your local machine's network connections. No external network calls are made, and no data leaves your computer except for the exported files you explicitly save.
+## ✨ Features
 
-## Prerequisites
+- 🔍 **Real-time Monitoring** - Live tracking of TCP/UDP connections
+- 👤 **Process Identification** - Maps connections to running processes with PID and process name
+- ⚠️ **Risk Assessment** - Intelligent risk scoring (Low/Medium/High) based on connection characteristics
+- 🔎 **Advanced Filtering** - Search, filter by protocol, state, risk level and more
+- 💾 **Export Capabilities** - Export connection data to JSON/CSV formats
+- 🔄 **Auto-refresh** - Automatic data refresh with configurable intervals (3s, 5s)
+- 📊 **Dashboard View** - Summary cards and process statistics
+- 🛡️ **Privacy Focused** - Monitors only your local machine, no external data transmission
+
+## 📸 Screenshots
+
+<div align="center">
+  <img src="screenshots/dashboard.png" width="400" alt="Dashboard View">
+  <img src="screenshots/connections.png" width="400" alt="Connections View">
+</div>
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React 18.3 + TypeScript 5.8 + Vite 7.0
+- **Backend**: Rust 1.70+ with Tauri 2.x
+- **UI Components**: Radix UI primitives with Tailwind CSS
+- **Platform Integration**: PowerShell (Windows), with Linux/macOS support planned
+- **Build Tool**: Vite + Tauri CLI
+
+## 🚀 Getting Started
+
+### Prerequisites
 
 - Node.js 18+ 
 - Rust 1.70+
 - Windows PowerShell (for Windows platform support)
 
-## Getting Started
+### Installation
 
-1. Install dependencies:
-```bash
-npm install
-```
+1. **Clone and install dependencies:**
+   ```bash
+   git clone <repository-url>
+   cd NetWatch
+   npm install
+   ```
 
-2. Run the development version:
-```bash
-npm run tauri dev
-```
+2. **Run the development version:**
+   ```bash
+   npm run tauri dev
+   ```
 
-3. To build a production version:
-```bash
-npm run tauri build
-```
+3. **To build a production version:**
+   ```bash
+   npm run tauri build
+   ```
 
-## Platform Support
+## 🌍 Platform Support
 
-- **Windows**: Fully supported using PowerShell commands (`Get-NetTCPConnection`, `Get-NetUDPEndpoint`)
-- **Linux**: Planned support using `ss` or `netstat` commands
-- **macOS**: Planned support using `lsof` or `netstat` commands
+- **Windows**: ✅ **Fully supported** using PowerShell commands (`Get-NetTCPConnection`, `Get-NetUDPEndpoint`)
+- **Linux**: 🔄 **Planned** support using `ss` or `netstat` commands  
+- **macOS**: 🔄 **Planned** support using `lsof` or `netstat` commands
 
-## Architecture
+## 🏗️ Architecture
 
 ### Backend (Rust/Tauri)
 - Collects network connection data using OS-specific commands
-- Maps PIDs to process names
+- Maps PIDs to process names with fallback mechanisms
 - Calculates risk levels based on connection characteristics
-- Provides Tauri commands for the frontend
+- Provides secure Tauri commands for the frontend
+- Robust error handling with comprehensive logging
 
 ### Frontend (React/TypeScript)
-- Displays connections in a sortable, filterable table
-- Provides search and filtering capabilities
-- Supports auto-refresh and manual refresh
-- Allows exporting data to JSON/CSV
+- Responsive UI with modern design patterns
+- Sortable, filterable connection tables
+- Advanced search and filtering capabilities
+- Auto-refresh and manual refresh options
+- Dashboard with summary statistics
+- Process detail views with risk analysis
 
-## Commands
+## 🎯 Commands
 
 - `get_connections()` - Retrieves current network connections with risk assessment
 - `export_connections(format, data)` - Exports connection data to specified format (JSON/CSV)
 
-## Risk Assessment
+## ⚠️ Risk Assessment
 
-The application uses a simple heuristic to assess connection risk:
+The application uses an intelligent heuristic to assess connection risk:
 
 - **High Risk**: Connections to known dangerous ports (23, 445, 3389, 5900, 3306, 27017, 4444, 1337, 6667) in ESTABLISHED state
 - **Medium Risk**: Connections to administrative ports, unknown processes, or non-standard high ports
 - **Low Risk**: Standard connections to known services
+- **Dynamic Scoring**: Adjusts based on connection state, port, and process ownership
 
-## Development
-
-The project follows a modular architecture:
-
-```
-src-tauri/
-├── src/
-│   ├── models/          # Data structures
-│   ├── services/        # Platform-specific collectors
-│   ├── commands/        # Tauri command handlers
-│   └── utils/           # Helper functions
-src/
-├── api/                 # Tauri API wrappers
-├── types/               # TypeScript type definitions
-├── components/          # Reusable UI components
-└── pages/               # Page components
-```
-
-## Security
+## 🛡️ Security
 
 This application is designed for local network monitoring only. It does not:
 - Send data to external servers
-- Access network packets
-- Perform any form of network scanning
+- Access network packet contents
+- Perform network scanning beyond local connections
 - Execute arbitrary shell commands with user input
 
-All PowerShell commands are constructed with fixed scripts and safe parameter passing.
+All system commands are constructed with fixed scripts and safe parameter passing.
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Tauri](https://tauri.app/) for secure native applications
+- UI powered by [Radix UI](https://www.radix-ui.com/) and [Tailwind CSS](https://tailwindcss.com/)
+- Icons from [Lucide](https://lucide.dev/)
