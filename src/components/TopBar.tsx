@@ -14,10 +14,12 @@ export function TopBar({ title, searchPlaceholder = 'Search...', onSearch, onRef
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
+  const handleRefresh = (isManual = true) => {
+    if (isManual) {
+      setIsRefreshing(true);
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
     onRefresh?.();
-    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   const handleSearch = (value: string) => {
@@ -30,7 +32,7 @@ export function TopBar({ title, searchPlaceholder = 'Search...', onSearch, onRef
     if (autoRefresh === null) return;
 
     const interval = setInterval(() => {
-      handleRefresh();
+      handleRefresh(false); // Auto refresh, no animation
     }, autoRefresh * 1000);
 
     return () => clearInterval(interval);
@@ -55,7 +57,7 @@ export function TopBar({ title, searchPlaceholder = 'Search...', onSearch, onRef
 
         {/* Refresh */}
         <button
-          onClick={handleRefresh}
+          onClick={() => handleRefresh(true)} // Manual refresh, with animation
           className="p-2 hover:bg-secondary rounded-lg transition-colors"
         >
           <RefreshCw className={`w-4 h-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
