@@ -156,11 +156,12 @@ impl WindowsConnectionCollector {
     }
 
     fn get_tcp_connections(&self) -> Result<Vec<PowerShellTcpConnection>, String> {
+        tracing::debug!("Attempting to fetch TCP connections via PowerShell");
         // Try primary method first
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
-                "Get-NetTCPConnection | Select-Object OwningProcess, LocalAddress, LocalPort, RemoteAddress, RemotePort, State | ConvertTo-Json"
+                "Get-NetTCPConnection | Select-Object @{Name='OwningProcess';Expression={if ($_.OwningProcess -eq 0) { $null } else { $_.OwningProcess }}}, LocalAddress, LocalPort, RemoteAddress, RemotePort, State | ConvertTo-Json -Compress"
             ])
             .output();
         
@@ -209,16 +210,30 @@ impl WindowsConnectionCollector {
         let stdout = String::from_utf8(output.stdout)
             .map_err(|e| format!("Failed to parse PowerShell output: {}", e))?;
 
+        tracing::debug!("PowerShell TCP command succeeded, parsing output of {} bytes", stdout.len());
+        
         // Handle both single object and array cases
         let connections: Result<Vec<PowerShellTcpConnection>, _> = serde_json::from_str(&stdout);
         
         match connections {
-            Ok(conns) => Ok(conns),
-            Err(_) => {
+            Ok(conns) => {
+                tracing::debug!("Successfully parsed {} TCP connections from PowerShell", conns.len());
+                Ok(conns)
+            },
+            Err(parse_error) => {
+                tracing::error!("Failed to parse TCP connections JSON: {}", parse_error);
+                tracing::debug!("JSON content: {:.500}", stdout);
+                
                 // Try parsing as single object
                 match serde_json::from_str::<PowerShellTcpConnection>(&stdout) {
-                    Ok(single_conn) => Ok(vec![single_conn]),
-                    Err(e) => Err(format!("Failed to parse TCP connections JSON: {}", e)),
+                    Ok(single_conn) => {
+                        tracing::debug!("Successfully parsed single TCP connection");
+                        Ok(vec![single_conn])
+                    },
+                    Err(e) => {
+                        tracing::error!("Also failed to parse as single TCP connection: {}", e);
+                        Err(format!("Failed to parse TCP connections JSON: {}", e))
+                    }
                 }
             }
         }
@@ -287,11 +302,12 @@ impl WindowsConnectionCollector {
     }
 
     fn get_udp_endpoints(&self) -> Result<Vec<PowerShellUdpEndpoint>, String> {
+        tracing::debug!("Attempting to fetch UDP endpoints via PowerShell");
         // Try primary method first
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
-                "Get-NetUDPEndpoint | Select-Object OwningProcess, LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json"
+                "Get-NetUDPEndpoint | Select-Object @{Name='OwningProcess';Expression={if ($_.OwningProcess -eq 0) { $null } else { $_.OwningProcess }}}, LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json -Compress"
             ])
             .output();
         
@@ -340,16 +356,30 @@ impl WindowsConnectionCollector {
         let stdout = String::from_utf8(output.stdout)
             .map_err(|e| format!("Failed to parse PowerShell UDP output: {}", e))?;
 
+        tracing::debug!("PowerShell UDP command succeeded, parsing output of {} bytes", stdout.len());
+        
         // Handle both single object and array cases
         let endpoints: Result<Vec<PowerShellUdpEndpoint>, _> = serde_json::from_str(&stdout);
         
         match endpoints {
-            Ok(endpoints) => Ok(endpoints),
-            Err(_) => {
+            Ok(endpoints) => {
+                tracing::debug!("Successfully parsed {} UDP endpoints from PowerShell", endpoints.len());
+                Ok(endpoints)
+            },
+            Err(parse_error) => {
+                tracing::error!("Failed to parse UDP endpoints JSON: {}", parse_error);
+                tracing::debug!("JSON content: {:.500}", stdout);
+                
                 // Try parsing as single object
                 match serde_json::from_str::<PowerShellUdpEndpoint>(&stdout) {
-                    Ok(single_endpoint) => Ok(vec![single_endpoint]),
-                    Err(e) => Err(format!("Failed to parse UDP endpoints JSON: {}", e)),
+                    Ok(single_endpoint) => {
+                        tracing::debug!("Successfully parsed single UDP endpoint");
+                        Ok(vec![single_endpoint])
+                    },
+                    Err(e) => {
+                        tracing::error!("Also failed to parse as single UDP endpoint: {}", e);
+                        Err(format!("Failed to parse UDP endpoints JSON: {}", e))
+                    }
                 }
             }
         }
@@ -416,11 +446,12 @@ impl WindowsConnectionCollector {
     }
 
     fn get_process_map(&self) -> Result<HashMap<u32, String>, String> {
+        tracing::debug!("Attempting to fetch process map via PowerShell");
         // Try primary method first
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
-                "Get-Process | Select-Object Id, ProcessName | ConvertTo-Json"
+                "Get-Process | Select-Object Id, ProcessName | ConvertTo-Json -Compress"
             ])
             .output();
         
@@ -468,16 +499,30 @@ impl WindowsConnectionCollector {
 
         let stdout = String::from_utf8(output.stdout)
             .map_err(|e| format!("Failed to parse PowerShell process output: {}", e))?;
-
+        
+        tracing::debug!("PowerShell process command succeeded, parsing output of {} bytes", stdout.len());
+        
         let processes: Result<Vec<PowerShellProcess>, _> = serde_json::from_str(&stdout);
         
         let process_list = match processes {
-            Ok(procs) => procs,
-            Err(_) => {
+            Ok(procs) => {
+                tracing::debug!("Successfully parsed {} processes from PowerShell", procs.len());
+                procs
+            },
+            Err(parse_error) => {
+                tracing::error!("Failed to parse processes JSON: {}", parse_error);
+                tracing::debug!("JSON content: {:.500}", stdout);
+                
                 // Try parsing as single object
                 match serde_json::from_str::<PowerShellProcess>(&stdout) {
-                    Ok(single_proc) => vec![single_proc],
-                    Err(e) => return Err(format!("Failed to parse processes JSON: {}", e)),
+                    Ok(single_proc) => {
+                        tracing::debug!("Successfully parsed single process");
+                        vec![single_proc]
+                    },
+                    Err(e) => {
+                        tracing::error!("Also failed to parse as single process: {}", e);
+                        return Err(format!("Failed to parse processes JSON: {}", e));
+                    }
                 }
             }
         };
