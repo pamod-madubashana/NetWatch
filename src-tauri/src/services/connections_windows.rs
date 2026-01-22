@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct PowerShellTcpConnection {
-    #[serde(rename = "OwningProcess")]
+    #[serde(rename = "OwningProcess", deserialize_with = "deserialize_optional_u32")]
     owning_process: Option<u32>,
     #[serde(rename = "LocalAddress")]
     local_address: String,
@@ -20,9 +20,42 @@ struct PowerShellTcpConnection {
     state: String,
 }
 
+fn deserialize_optional_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    use serde_json::Value;
+    
+    let value = Value::deserialize(deserializer)?;
+    
+    match value {
+        Value::Number(n) => {
+            if let Some(n) = n.as_u64() {
+                if n <= u32::MAX as u64 {
+                    Ok(Some(n as u32))
+                } else {
+                    Ok(None) // Number too large for u32
+                }
+            } else {
+                Ok(None) // Not an unsigned integer
+            }
+        },
+        Value::String(s) => {
+            if let Ok(n) = s.parse::<u32>() {
+                Ok(Some(n))
+            } else {
+                Ok(None)
+            }
+        },
+        Value::Null => Ok(None),
+        _ => Ok(None), // Any other type becomes None
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct PowerShellUdpEndpoint {
-    #[serde(rename = "OwningProcess")]
+    #[serde(rename = "OwningProcess", deserialize_with = "deserialize_optional_u32")]
     owning_process: Option<u32>,
     #[serde(rename = "LocalAddress")]
     local_address: String,
@@ -36,10 +69,43 @@ struct PowerShellUdpEndpoint {
 
 #[derive(Debug, Deserialize, Serialize)]
 struct PowerShellProcess {
-    #[serde(rename = "Id")]
+    #[serde(rename = "Id", deserialize_with = "deserialize_u32_flexible")]
     id: u32,
     #[serde(rename = "ProcessName")]
     name: String,
+}
+
+fn deserialize_u32_flexible<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    use serde_json::Value;
+    
+    let value = Value::deserialize(deserializer)?;
+    
+    match value {
+        Value::Number(n) => {
+            if let Some(n) = n.as_u64() {
+                if n <= u32::MAX as u64 {
+                    Ok(n as u32)
+                } else {
+                    Ok(0) // Number too large for u32
+                }
+            } else {
+                Ok(0) // Not an unsigned integer
+            }
+        },
+        Value::String(s) => {
+            if let Ok(n) = s.parse::<u32>() {
+                Ok(n)
+            } else {
+                Ok(0)
+            }
+        },
+        Value::Null => Ok(0),
+        _ => Ok(0), // Any other type becomes 0
+    }
 }
 
 pub struct WindowsConnectionCollector;
@@ -161,7 +227,7 @@ impl WindowsConnectionCollector {
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
-                "Get-NetTCPConnection | Select-Object @{Name='OwningProcess';Expression={if ($_.OwningProcess -eq 0) { $null } else { $_.OwningProcess }}}, LocalAddress, LocalPort, RemoteAddress, RemotePort, State | ConvertTo-Json -Compress"
+                "Get-NetTCPConnection | Select-Object @{Name='OwningProcess';Expression={[int]$_.OwningProcess}}, LocalAddress, LocalPort, RemoteAddress, RemotePort, State | ConvertTo-Json -Compress"
             ])
             .output();
         
@@ -307,7 +373,7 @@ impl WindowsConnectionCollector {
         let output = Command::new("powershell.exe")
             .args([
                 "-Command",
-                "Get-NetUDPEndpoint | Select-Object @{Name='OwningProcess';Expression={if ($_.OwningProcess -eq 0) { $null } else { $_.OwningProcess }}}, LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json -Compress"
+                "Get-NetUDPEndpoint | Select-Object @{Name='OwningProcess';Expression={[int]$_.OwningProcess}}, LocalAddress, LocalPort, RemoteAddress, RemotePort | ConvertTo-Json -Compress"
             ])
             .output();
         
