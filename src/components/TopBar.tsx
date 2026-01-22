@@ -1,6 +1,6 @@
 import { Search, RefreshCw } from 'lucide-react';
 import { StatusDot } from './StatusDot';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface TopBarProps {
   title: string;
@@ -24,6 +24,17 @@ export function TopBar({ title, searchPlaceholder = 'Search...', onSearch, onRef
     setSearchQuery(value);
     onSearch?.(value);
   };
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (autoRefresh === null) return;
+
+    const interval = setInterval(() => {
+      handleRefresh();
+    }, autoRefresh * 1000);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, onRefresh]);
 
   return (
     <header className="h-14 flex-shrink-0 bg-card border-b border-border flex items-center justify-between px-6">
