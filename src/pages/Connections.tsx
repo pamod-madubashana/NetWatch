@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { RotateCcw, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -40,7 +41,7 @@ export default function Connections() {
       const fetchedConnections = await getConnections();
       setConnections(fetchedConnections);
     } catch (err) {
-      console.error('Failed to fetch connections:', err);
+      logger.error('Failed to fetch connections:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch connections');
     } finally {
       setLoading(false);
@@ -64,7 +65,7 @@ export default function Connections() {
         description: `File saved to: ${filePath}`,
       });
     } catch (err) {
-      console.error('Export failed:', err);
+      logger.error('Export failed:', err);
       toast({
         title: 'Export failed',
         description: err instanceof Error ? err.message : 'An error occurred during export',
