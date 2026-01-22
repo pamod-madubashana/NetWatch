@@ -134,19 +134,10 @@ export default function Connections() {
         title="Connections" 
         searchPlaceholder="Quick search..."
         onSearch={setSearchQuery}
+        onRefresh={fetchConnections}
       />
               
       <div className="flex gap-2 mb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={fetchConnections}
-          disabled={loading}
-        >
-          <RotateCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-                
         <Button
           variant="outline"
           size="sm"

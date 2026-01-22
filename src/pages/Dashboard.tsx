@@ -78,12 +78,25 @@ export default function Dashboard() {
       .sort((a, b) => b.count - a.count);
   }, [connections]);
 
+  const fetchConnections = async () => {
+    try {
+      setLoading(true);
+      const fetchedConnections = await getConnections();
+      setConnections(fetchedConnections);
+    } catch (error) {
+      console.error('Failed to fetch connections:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <TopBar 
         title="Dashboard" 
         searchPlaceholder="Search connections..."
         onSearch={setSearchQuery}
+        onRefresh={fetchConnections}
       />
       
       <main className="flex-1 overflow-auto p-6 min-h-0">
