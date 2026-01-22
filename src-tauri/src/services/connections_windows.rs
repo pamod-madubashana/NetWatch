@@ -50,9 +50,29 @@ impl WindowsConnectionCollector {
     }
 
     pub fn get_connections(&self) -> Result<Vec<Connection>, String> {
-        let tcp_connections = self.get_tcp_connections()?;
-        let udp_endpoints = self.get_udp_endpoints()?;
-        let process_map = self.get_process_map()?;
+        tracing::debug!("Starting to fetch TCP connections");
+        let tcp_connections = self.get_tcp_connections()
+            .map_err(|e| {
+                tracing::error!("Failed to fetch TCP connections: {}", e);
+                e
+            })?;
+        tracing::debug!("Successfully fetched {} TCP connections", tcp_connections.len());
+        
+        tracing::debug!("Starting to fetch UDP endpoints");
+        let udp_endpoints = self.get_udp_endpoints()
+            .map_err(|e| {
+                tracing::error!("Failed to fetch UDP endpoints: {}", e);
+                e
+            })?;
+        tracing::debug!("Successfully fetched {} UDP endpoints", udp_endpoints.len());
+        
+        tracing::debug!("Starting to fetch process map");
+        let process_map = self.get_process_map()
+            .map_err(|e| {
+                tracing::error!("Failed to fetch process map: {}", e);
+                e
+            })?;
+        tracing::debug!("Successfully fetched process map with {} entries", process_map.len());
 
         let mut connections = Vec::new();
         let timestamp = std::time::SystemTime::now()
