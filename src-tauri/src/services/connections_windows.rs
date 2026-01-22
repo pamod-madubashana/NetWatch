@@ -99,10 +99,59 @@ struct PowerShellUdpEndpoint {
     local_address: String,
     #[serde(rename = "LocalPort")]
     local_port: u16,
-    #[serde(rename = "RemoteAddress")]
+    #[serde(rename = "RemoteAddress", deserialize_with = "deserialize_optional_string")]
     remote_address: String,
-    #[serde(rename = "RemotePort")]
+    #[serde(rename = "RemotePort", deserialize_with = "deserialize_optional_u16")]
     remote_port: u16,
+}
+
+fn deserialize_optional_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    use serde_json::Value;
+    
+    let value = Value::deserialize(deserializer)?;
+    
+    match value {
+        Value::String(s) => Ok(s),
+        Value::Null => Ok("".to_string()), // Use empty string for null
+        _ => Ok("unknown".to_string()), // Any other type becomes "unknown"
+    }
+}
+
+fn deserialize_optional_u16<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    use serde_json::Value;
+    
+    let value = Value::deserialize(deserializer)?;
+    
+    match value {
+        Value::Number(n) => {
+            if let Some(n) = n.as_u64() {
+                if n <= u16::MAX as u64 {
+                    Ok(n as u16)
+                } else {
+                    Ok(0) // Number too large for u16
+                }
+            } else {
+                Ok(0) // Not an unsigned integer
+            }
+        },
+        Value::String(s) => {
+            if let Ok(n) = s.parse::<u16>() {
+                Ok(n)
+            } else {
+                Ok(0)
+            }
+        },
+        Value::Null => Ok(0),
+        _ => Ok(0), // Any other type becomes 0
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
