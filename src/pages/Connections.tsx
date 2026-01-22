@@ -5,11 +5,8 @@ import { ConnectionsTable } from '@/components/ConnectionsTable';
 import { Pagination } from '@/components/Pagination';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { getConnections, exportConnections } from '@/api/tauri';
+import { getConnections } from '@/api/tauri';
 import { Connection } from '@/types/netwatch';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 
@@ -29,8 +26,7 @@ export default function Connections() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
+
   
   const { toast } = useToast();
 
@@ -48,59 +44,11 @@ export default function Connections() {
     }
   };
 
-  const handleExport = async (format: 'json' | 'csv') => {
-    try {
-      if (connections.length === 0) {
-        toast({
-          title: 'Nothing to export',
-          description: 'No connections available to export.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      
-      const filePath = await exportConnections(format, connections);
-      toast({
-        title: 'Export successful',
-        description: `File saved to: ${filePath}`,
-      });
-    } catch (err) {
-      logger.error('Export failed:', err);
-      toast({
-        title: 'Export failed',
-        description: err instanceof Error ? err.message : 'An error occurred during export',
-        variant: 'destructive',
-      });
-    }
-  };
+
 
   useEffect(() => {
     fetchConnections();
-    
-    return () => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-      }
-    };
   }, []);
-
-  useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(fetchConnections, 5000); // Refresh every 5 seconds
-      setRefreshInterval(interval);
-    } else {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-        setRefreshInterval(null);
-      }
-    }
-    
-    return () => {
-      if (refreshInterval) {
-        clearInterval(refreshInterval);
-      }
-    };
-  }, [autoRefresh]);
 
   const filteredConnections = useMemo(() => {
     let result = applyFilters(connections, filters);
@@ -137,33 +85,7 @@ export default function Connections() {
         onRefresh={fetchConnections}
       />
               
-      <div className="flex gap-2 mb-4">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setAutoRefresh(!autoRefresh)}
-          className={autoRefresh ? 'bg-accent' : ''}
-        >
-          Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
-        </Button>
-                
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleExport('json')}>
-              Export as JSON
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExport('csv')}>
-              Export as CSV
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <div className="mb-4"></div>
       
       <main className="flex-1 overflow-auto p-6 min-h-0">
 

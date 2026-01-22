@@ -220,17 +220,31 @@ impl WindowsConnectionCollector {
                     continue; // Only interested in TCP
                 }
                 
-                // Parse local address:port
-                let local_parts: Vec<&str> = parts[1].rsplitn(2, ':').collect();
-                if local_parts.len() < 2 { continue; }
-                let local_port: u16 = local_parts[0].parse().unwrap_or(0);
-                let local_address = local_parts[1].trim();
+                // Parse local address:port - netstat format is ADDRESS:PORT
+                let local_addr_port = parts[1];
+                let local_split_pos = local_addr_port.rfind(':');
+                let (local_address, local_port) = match local_split_pos {
+                    Some(pos) => {
+                        let addr = &local_addr_port[..pos];
+                        let port_str = &local_addr_port[pos+1..];
+                        let port: u16 = port_str.parse().unwrap_or(0);
+                        (addr, port)
+                    },
+                    None => (local_addr_port, 0),
+                };
                 
                 // Parse remote address:port
-                let remote_parts: Vec<&str> = parts[2].rsplitn(2, ':').collect();
-                if remote_parts.len() < 2 { continue; }
-                let remote_port: u16 = remote_parts[0].parse().unwrap_or(0);
-                let remote_address = remote_parts[1].trim();
+                let remote_addr_port = parts[2];
+                let remote_split_pos = remote_addr_port.rfind(':');
+                let (remote_address, remote_port) = match remote_split_pos {
+                    Some(pos) => {
+                        let addr = &remote_addr_port[..pos];
+                        let port_str = &remote_addr_port[pos+1..];
+                        let port: u16 = port_str.parse().unwrap_or(0);
+                        (addr, port)
+                    },
+                    None => (remote_addr_port, 0),
+                };
                 
                 // State and PID
                 let state = if parts.len() >= 5 { parts[3].to_string() } else { "UNKNOWN".to_string() };
@@ -337,20 +351,31 @@ impl WindowsConnectionCollector {
                     continue; // Only interested in UDP
                 }
                 
-                // Parse local address:port
-                let local_parts: Vec<&str> = parts[1].rsplitn(2, ':').collect();
-                if local_parts.len() < 2 { continue; }
-                let local_port: u16 = local_parts[0].parse().unwrap_or(0);
-                let local_address = local_parts[1].trim();
+                // Parse local address:port - netstat format is ADDRESS:PORT
+                let local_addr_port = parts[1];
+                let local_split_pos = local_addr_port.rfind(':');
+                let (local_address, local_port) = match local_split_pos {
+                    Some(pos) => {
+                        let addr = &local_addr_port[..pos];
+                        let port_str = &local_addr_port[pos+1..];
+                        let port: u16 = port_str.parse().unwrap_or(0);
+                        (addr, port)
+                    },
+                    None => (local_addr_port, 0),
+                };
                 
                 // For UDP, the remote address may be "*" (any address)
-                let remote_parts: Vec<&str> = parts[2].rsplitn(2, ':').collect();
-                let remote_port: u16 = if remote_parts.len() >= 2 { 
-                    remote_parts[0].parse().unwrap_or(0) 
-                } else { 0 };
-                let remote_address = if remote_parts.len() >= 2 { 
-                    remote_parts[1].trim() 
-                } else { "*" };
+                let remote_addr_port = parts[2];
+                let remote_split_pos = remote_addr_port.rfind(':');
+                let (remote_address, remote_port) = match remote_split_pos {
+                    Some(pos) => {
+                        let addr = &remote_addr_port[..pos];
+                        let port_str = &remote_addr_port[pos+1..];
+                        let port: u16 = port_str.parse().unwrap_or(0);
+                        (addr, port)
+                    },
+                    None => (remote_addr_port, 0),
+                };
                 
                 // PID is the last column
                 let pid: u32 = if parts.len() >= 5 { 
