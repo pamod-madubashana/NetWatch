@@ -16,7 +16,7 @@ struct PowerShellTcpConnection {
     remote_address: String,
     #[serde(rename = "RemotePort")]
     remote_port: u16,
-    #[serde(rename = "State")]
+    #[serde(rename = "State", deserialize_with = "deserialize_state")]
     state: String,
 }
 
@@ -50,6 +50,44 @@ where
         },
         Value::Null => Ok(None),
         _ => Ok(None), // Any other type becomes None
+    }
+}
+
+fn deserialize_state<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    use serde_json::Value;
+    
+    let value = Value::deserialize(deserializer)?;
+    
+    match value {
+        Value::Number(n) => {
+            if let Some(n) = n.as_u64() {
+                // Convert Windows TCP state numbers to readable strings
+                let state_str = match n {
+                    1 => "Closed",
+                    2 => "Listen",
+                    3 => "SynSent",
+                    4 => "SynReceived",
+                    5 => "Established",
+                    6 => "FinWait1",
+                    7 => "FinWait2",
+                    8 => "CloseWait",
+                    9 => "Closing",
+                    10 => "LastAck",
+                    11 => "TimeWait",
+                    12 => "DeleteTCB",
+                    _ => "Unknown",
+                };
+                Ok(state_str.to_string())
+            } else {
+                Ok("Unknown".to_string())
+            }
+        },
+        Value::String(s) => Ok(s),
+        _ => Ok("Unknown".to_string()),
     }
 }
 
