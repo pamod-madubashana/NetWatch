@@ -1,11 +1,11 @@
-# NetWatch 🌐
+<h1 align="center">NetWatch 🌐</h1>
 
 <p align="center">
   <img src="src-tauri/icons/icon.png" alt="NetWatch Logo" width="128" height="128">
 </p>
 
 <p align="center">
-  <strong>A portfolio-quality network monitoring application built with Tauri, Rust, and React</strong>
+  <strong>A network monitoring application built with Tauri, Rust, and React</strong>
 </p>
 
 <p align="center">
